@@ -70,13 +70,17 @@ function Profile() {
 
   // Project states
   const [selectedProject, setSelectedProject] = useState(null);
-  const [profileImage, setProfileImage] = useState(
-    user.profileImage ? 
-      user.profileImage.startsWith('/uploads') ? 
+  
+  // Updated profile image state initialization
+  const [profileImage, setProfileImage] = useState(() => {
+    if (user.profileImage) {
+      return user.profileImage.startsWith('/uploads') ? 
         `https://globalindiabackendnew.onrender.com${user.profileImage}` : 
-        user.profileImage 
-      : avatar5
-  );
+        user.profileImage;
+    }
+    return avatar5; // fallback to default avatar
+  });
+  
   const [projects, setProjects] = useState([]);
 
   // UI colors
@@ -93,6 +97,17 @@ function Profile() {
   useEffect(() => {
     loadUserProjects();
   }, []);
+
+  // Add useEffect to handle profile image loading on component mount
+  useEffect(() => {
+    // Load profile image properly when component mounts
+    if (user.profileImage && !profileImage.includes('avatar')) {
+      const fullImageUrl = user.profileImage.startsWith('/uploads') ? 
+        `https://globalindiabackendnew.onrender.com${user.profileImage}` : 
+        user.profileImage;
+      setProfileImage(fullImageUrl);
+    }
+  }, [user.profileImage]);
 
   // Load user projects from the backend
   const loadUserProjects = async () => {
@@ -194,7 +209,7 @@ function Profile() {
     setProfileInfo({ ...profileInfo, [name]: value });
   };
 
-  // Profile image upload handler
+  // Updated handleImageUpload function
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -204,7 +219,7 @@ function Profile() {
       formData.append("email", profileInfo.email);
       
       try {
-        // First update the preview
+        // First update the preview immediately
         const reader = new FileReader();
         reader.onloadend = () => {
           setProfileImage(reader.result);
@@ -231,12 +246,12 @@ function Profile() {
             sessionStorage.setItem("user", JSON.stringify(updatedUser));
           }
           
-          // Update profile image state with full URL if needed
-          setProfileImage(
-            response.data.imageUrl.startsWith('/uploads') ? 
-              `https://globalindiabackendnew.onrender.com${response.data.imageUrl}` : 
-              response.data.imageUrl
-          );
+          // Update profile image state with full URL
+          const fullImageUrl = response.data.imageUrl.startsWith('/uploads') ? 
+            `https://globalindiabackendnew.onrender.com${response.data.imageUrl}` : 
+            response.data.imageUrl;
+          
+          setProfileImage(fullImageUrl);
           
           toast({
             title: "Image uploaded",
@@ -484,12 +499,17 @@ function Profile() {
           direction={{ base: "column", md: "row" }}
           w={{ base: "100%" }}
           textAlign={{ base: "center", md: "start" }}>
+          {/* Updated Avatar component to handle image loading errors */}
           <Avatar
             me={{ md: "22px" }}
             src={profileImage}
             w="80px"
             h="80px"
             borderRadius="15px"
+            onError={(e) => {
+              // If image fails to load, use default avatar
+              e.target.src = avatar5;
+            }}
           />
           <Flex direction="column" maxWidth="100%" my={{ base: "14px" }}>
             <Text

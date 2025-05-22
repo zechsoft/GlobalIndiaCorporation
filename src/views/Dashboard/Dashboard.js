@@ -48,6 +48,9 @@ import {
 // Variables
 import { dailyWorkData, socialTraffic } from "variables/general";
 
+// Create a motion button component
+const MotionButton = motion(Button);
+
 export default function Dashboard() {
   // Chakra Color Mode
   const iconBlue = useColorModeValue("blue.500", "blue.500");
@@ -717,9 +720,15 @@ export default function Dashboard() {
                   &gt;
                 </Button>
               </Flex>
-              <Button variant="primary" maxH="30px"  onClick={() => handleCardClick("Daily Work Report")} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <MotionButton
+                variant="primary"
+                maxH="30px"
+                onClick={() => handleCardClick("Daily Work Report")}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
                 SEE ALL
-              </Button>
+              </MotionButton>
             </Flex>
             <Box overflow={{ sm: "scroll", lg: "hidden" }}>
               <Table>
