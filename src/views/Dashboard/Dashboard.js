@@ -17,13 +17,25 @@ import {
   Tr,
   useColorMode,
   useColorModeValue,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  VStack
 } from "@chakra-ui/react";
 // Custom components
 import Card from "components/Card/Card.js";
 import IconBox from "components/Icons/IconBox";
 import { React, useState, useEffect } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { motion } from "framer-motion"; // Importing motion for animations
+import { motion } from "framer-motion";
 import axios from "axios";
 
 // Custom icons
@@ -51,18 +63,29 @@ export default function Dashboard() {
   const location = useLocation();
   
   // Backend API URL
-  const API_URL = "https://globalindiabackendnew.onrender.com/api";
+    const API_URL = "https://globalindiabackendnew.onrender.com/api";
+
   
-  // State for all data tables
-  const [suppliers, setSuppliers] = useState([]);
-  const [materialInquiries, setMaterialInquiries] = useState([]);
-  const [customerDeliveries, setCustomerDeliveries] = useState([]);
-  const [customerOrders, setCustomerOrders] = useState([]);
-  const [materialReplenishments, setMaterialReplenishments] = useState([]);
+  // State for dashboard table data
+  const [dashboardTableData, setDashboardTableData] = useState({
+    "Material Inquiry": [],
+    "Supplier Information": [],
+    "Customer Delivery": [],
+    "Customer Order": [],
+    "Material Replenishment": []
+  });
+
+  // Edit modal state
+  const [editModal, setEditModal] = useState({
+    isOpen: false,
+    data: null,
+    tableName: ""
+  });
+
   const [currentTableData, setCurrentTableData] = useState([]);
   const [allDailyWorkData, setAllDailyWorkData] = useState([]);
 
-  // Table navigation - defined once only
+  // Table navigation
   const [currentTable, setCurrentTable] = useState("Material Inquiry");
   const tableNames = [
     "Supplier Information",
@@ -72,7 +95,6 @@ export default function Dashboard() {
     "Material Replenishment"
   ];
   
-  // Determine if we're in admin or client mode based on the current path
   const [userType, setUserType] = useState('');
   const [dailyData, setDailyData] = useState([]);
 
@@ -81,30 +103,15 @@ export default function Dashboard() {
     if (!data || !Array.isArray(data)) return [];
     
     const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0); // Set to beginning of day for comparison
+    targetDate.setHours(0, 0, 0, 0);
     
     return data.filter(item => {
       if (!item.Date) return false;
       const itemDate = new Date(item.Date);
       itemDate.setHours(0, 0, 0, 0);
       return itemDate.getTime() === targetDate.getTime();
-    }).slice(0, 5); // Limit to 5 entries
+    }).slice(0, 5);
   };
-
-  // Initialize currentTableData based on the currentTable state
-  useEffect(() => {
-    if (currentTable === "Material Inquiry" && materialInquiries.length > 0) {
-      setCurrentTableData(materialInquiries.slice(0, 5));
-    }
-  }, [currentTable, materialInquiries]);
-
-  // Update daily data when currentDate changes
-  useEffect(() => {
-    if (allDailyWorkData.length > 0) {
-      const filteredData = filterDailyWorkByDate(allDailyWorkData, currentDate);
-      setDailyData(filteredData);
-    }
-  }, [currentDate, allDailyWorkData]);
 
   // Fetch all data when component mounts
   useEffect(() => {
@@ -118,28 +125,14 @@ export default function Dashboard() {
         const filteredDailyData = filterDailyWorkByDate(dailyWorkResponse.data.data, currentDate);
         setDailyData(filteredDailyData);
         
-        // Fetch supplier info
-        const suppliersResponse = await axios.get(`${API_URL}/supplier/get-all`);
-        setSuppliers(suppliersResponse.data.data);
+        // Fetch dashboard table data from the new endpoint
+        const dashboardResponse = await axios.get(`${API_URL}/dashboard-tables/get-all`);
+        if (dashboardResponse.data.success) {
+          setDashboardTableData(dashboardResponse.data.data);
+          // Set initial current table data
+          setCurrentTableData(dashboardResponse.data.data["Material Inquiry"] || []);
+        }
         
-        // Fetch material inquiries
-        const materialInquiriesResponse = await axios.get(`${API_URL}/material-inquiry/get-all`);
-        setMaterialInquiries(materialInquiriesResponse.data.data);
-        
-        // Fetch customer deliveries
-        const customerDeliveriesResponse = await axios.get(`${API_URL}/customer-delivery/get-all`);
-        setCustomerDeliveries(customerDeliveriesResponse.data.data);
-        
-        // Fetch customer orders
-        const customerOrdersResponse = await axios.get(`${API_URL}/customer-order/get-all`);
-        setCustomerOrders(customerOrdersResponse.data.data);
-        
-        // Fetch material replenishments
-        const materialReplenishmentsResponse = await axios.get(`${API_URL}/material-replenishment/get-all`);
-        setMaterialReplenishments(materialReplenishmentsResponse.data.data);
-        
-        // Initialize current table data with material inquiries
-        setCurrentTableData(materialInquiriesResponse.data.data.slice(0, 5));
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -161,10 +154,9 @@ export default function Dashboard() {
     }
   }, [location]);
 
-  // Unified navigation function that handles both admin and client routes
+  // Navigation function
   const navigateTo = (page) => {
-    console.log(userType,"",page,"in dash.js bastard");
-    // Use the detected userType (admin or client) as the base path
+    console.log(userType,"",page,"in dash.js");
     history.push(`/${userType}/${page}`);
   };
 
@@ -187,57 +179,54 @@ export default function Dashboard() {
   const handlePrevTable = () => {
     const currentIndex = tableNames.indexOf(currentTable);
     if (currentIndex > 0) {
-      setCurrentTable(tableNames[currentIndex - 1]);
-      // Set appropriate data based on table name
-      switch(tableNames[currentIndex - 1]) {
-        case "Supplier Information":
-          setCurrentTableData(suppliers.slice(0, 5));
-          break;
-        case "Material Inquiry":
-          setCurrentTableData(materialInquiries.slice(0, 5));
-          break;
-        case "Customer Delivery":
-          setCurrentTableData(customerDeliveries.slice(0, 5));
-          break;
-        case "Customer Order":
-          setCurrentTableData(customerOrders.slice(0, 5));
-          break;
-        case "Material Replenishment":
-          setCurrentTableData(materialReplenishments.slice(0, 5));
-          break;
-        default:
-          setCurrentTableData([]);
-      }
+      const newTable = tableNames[currentIndex - 1];
+      setCurrentTable(newTable);
+      setCurrentTableData(dashboardTableData[newTable] || []);
     }
   };
 
   const handleNextTable = () => {
     const currentIndex = tableNames.indexOf(currentTable);
     if (currentIndex < tableNames.length - 1) {
-      setCurrentTable(tableNames[currentIndex + 1]);
-      // Set appropriate data based on table name
-      switch(tableNames[currentIndex + 1]) {
-        case "Supplier Information":
-          setCurrentTableData(suppliers.slice(0, 5));
-          break;
-        case "Material Inquiry":
-          setCurrentTableData(materialInquiries.slice(0, 5));
-          break;
-        case "Customer Delivery":
-          setCurrentTableData(customerDeliveries.slice(0, 5));
-          break;
-        case "Customer Order":
-          setCurrentTableData(customerOrders.slice(0, 5));
-          break;
-        case "Material Replenishment":
-          setCurrentTableData(materialReplenishments.slice(0, 5));
-          break;
-        default:
-          setCurrentTableData([]);
-      }
+      const newTable = tableNames[currentIndex + 1];
+      setCurrentTable(newTable);
+      setCurrentTableData(dashboardTableData[newTable] || []);
     }
   };
-  
+
+  // Edit functionality
+  const handleEdit = (item, tableName) => {
+    setEditModal({
+      isOpen: true,
+      data: item,
+      tableName: tableName
+    });
+  };
+
+  const handleSaveEdit = async (updatedData) => {
+    try {
+      const response = await axios.put(`${API_URL}/dashboard-tables/update/${updatedData._id}`, {
+        ...updatedData,
+        tableName: editModal.tableName
+      });
+      
+      if (response.data.success) {
+        // Update local state
+        const updatedDashboardData = { ...dashboardTableData };
+        const tableData = updatedDashboardData[editModal.tableName];
+        const itemIndex = tableData.findIndex(item => item._id === updatedData._id);
+        if (itemIndex !== -1) {
+          tableData[itemIndex] = response.data.data;
+          setDashboardTableData(updatedDashboardData);
+          setCurrentTableData(updatedDashboardData[currentTable] || []);
+        }
+        setEditModal({ isOpen: false, data: null, tableName: "" });
+      }
+    } catch (error) {
+      console.error("Error updating data:", error);
+    }
+  };
+
   const isToday = currentDate.toLocaleDateString() === new Date().toLocaleDateString();
   
   const formattedDate = currentDate.toLocaleDateString(undefined, {
@@ -263,6 +252,68 @@ export default function Dashboard() {
     if (route) {
       navigateTo(route);
     }
+  };
+
+  // EditModal component
+  const EditModal = () => {
+    const [formData, setFormData] = useState(editModal.data || {});
+
+    useEffect(() => {
+      setFormData(editModal.data || {});
+    }, [editModal.data]);
+
+    const handleInputChange = (field, value) => {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    return (
+      <Modal isOpen={editModal.isOpen} onClose={() => setEditModal({ isOpen: false, data: null, tableName: "" })}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Edit {editModal.tableName}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>Project</FormLabel>
+                <Input
+                  value={formData.project || ""}
+                  onChange={(e) => handleInputChange("project", e.target.value)}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Status</FormLabel>
+                <Select
+                  value={formData.status || ""}
+                  onChange={(e) => handleInputChange("status", e.target.value)}
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>Date</FormLabel>
+                <Input
+                  type="date"
+                  value={formData.date ? new Date(formData.date).toISOString().split('T')[0] : ""}
+                  onChange={(e) => handleInputChange("date", e.target.value)}
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={() => setEditModal({ isOpen: false, data: null, tableName: "" })}>
+              Cancel
+            </Button>
+            <Button colorScheme="blue" onClick={() => handleSaveEdit(formData)}>
+              Save
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    );
   };
 
   return (
@@ -642,7 +693,7 @@ export default function Dashboard() {
                   fontSize="lg"
                   color="gray.400"
                   ml="10px"
-                  style={{ display: isToday ? 'none' : 'block' }} // Hide if today
+                  style={{ display: isToday ? 'none' : 'block' }}
                 >
                   &gt;
                 </Button>
@@ -741,7 +792,7 @@ export default function Dashboard() {
                   {dailyData.map((el, index, arr) => (
                     <Tr
                       key={index}
-                      _hover={{ bg: "blue.50" }} // Hover effect for rows
+                      _hover={{ bg: "blue.50" }}
                       transition="background-color 0.3s ease"
                     >
                       <Td color={textTableColor} fontSize="sm" fontWeight="bold" borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
@@ -768,7 +819,7 @@ export default function Dashboard() {
           <Flex direction="column">
             <Flex align="center" justify="space-between" p="22px">
               <Text fontSize="lg" color={textColor} fontWeight="bold">
-                {currentTable} {/* Display the current table name */}
+                {currentTable}
               </Text>
               <Button 
                 variant="link" 
@@ -776,7 +827,7 @@ export default function Dashboard() {
                 color="gray.400" 
                 ml="auto" 
                 mr="30px" 
-                onClick={handlePrevTable} // Handle previous table
+                onClick={handlePrevTable}
               >
                 Previous
               </Button>
@@ -784,7 +835,7 @@ export default function Dashboard() {
                 variant="link" 
                 fontSize="sm" 
                 color="gray.400" 
-                onClick={handleNextTable} // Handle next table
+                onClick={handleNextTable}
               >
                 Next
               </Button>
@@ -867,19 +918,29 @@ export default function Dashboard() {
                       transition="background-color 0.3s ease"
                     >
                       <Td color={textTableColor} fontSize="sm" fontWeight="bold" borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
-                        {item.projectName || item.name || item.customerName || item.materialName || "N/A"}
+                        {item.project || "N/A"}
                       </Td>
                       <Td color={textTableColor} fontSize="sm" borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
                         {item.status || "Pending"}
                       </Td>
                       <Td color={textTableColor} fontSize="sm" borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
-                        {new Date(item.createdAt || item.date).toLocaleDateString()}
+                        {new Date(item.date).toLocaleDateString()}
+                      </Td>
+                      <Td borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          variant="ghost"
+                          onClick={() => handleEdit(item, currentTable)}
+                        >
+                          ✏️
+                        </Button>
                       </Td>
                     </Tr>
                   ))
                 ) : (
                   <Tr>
-                    <Td colSpan={3} textAlign="center">No data available</Td>
+                    <Td colSpan={4} textAlign="center">No data available</Td>
                   </Tr>
                 )}
               </Tbody>
@@ -887,6 +948,9 @@ export default function Dashboard() {
           </Box>
         </Card>
       </Grid>
+
+      {/* Edit Modal */}
+      <EditModal />
     </Flex>
   );
 }
