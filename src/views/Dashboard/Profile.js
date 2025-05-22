@@ -138,36 +138,37 @@ function Profile() {
   };
 
   // Load user projects from the backend
-  const loadUserProjects = async () => {
-    try {
-      const response = await axios.post("https://globalindiabackendnew.onrender.com/api/get-projects", {
-        email: user.email
-      }, {
-        withCredentials: true
-      });
+ const loadUserProjects = async () => {
+  try {
+    const response = await axios.post("https://globalindiabackendnew.onrender.com/api/get-projects", {
+      email: user.email
+    }, {
+      withCredentials: true
+    });
+    
+    if (response.status === 200 && response.data.projects) {
+      // Format project images with proper URLs and ensure consistent ID field
+      const formattedProjects = response.data.projects.map(project => ({
+        ...project,
+        id: project._id || project.id, // Use _id as primary, fallback to id
+        image: project.image && project.image.startsWith('/uploads') ? 
+          `https://globalindiabackendnew.onrender.com${project.image}` : 
+          project.image
+      }));
       
-      if (response.status === 200 && response.data.projects) {
-        // Format project images with proper URLs
-        const formattedProjects = response.data.projects.map(project => ({
-          ...project,
-          image: project.image && project.image.startsWith('/uploads') ? 
-            `https://globalindiabackendnew.onrender.com${project.image}` : 
-            project.image
-        }));
-        
-        setProjects(formattedProjects);
-      }
-    } catch (err) {
-      console.error("Error loading projects:", err);
-      toast({
-        title: "Failed to load projects",
-        description: "There was an error loading your projects",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      setProjects(formattedProjects);
     }
-  };
+  } catch (err) {
+    console.error("Error loading projects:", err);
+    toast({
+      title: "Failed to load projects",
+      description: "There was an error loading your projects",
+      status: "error",
+      duration: 3000,
+      isClosable: true,
+    });
+  }
+};
 
   // Profile editing handlers
   const handleEditProfileClick = () => {
@@ -469,36 +470,36 @@ function Profile() {
   };
 
   // Delete a project
-  const handleDeleteProject = async (projectId) => {
-    try {
-      const response = await axios.post("https://globalindiabackendnew.onrender.com/api/delete-project", {
-        projectId: projectId,
-        email: profileInfo.email
-      }, {
-        withCredentials: true
-      });
-      
-      if (response.status === 200) {
-        setProjects(projects.filter(project => project.id !== projectId));
-        toast({
-          title: "Project deleted",
-          description: "Your project has been deleted successfully",
-          status: "success",
-          duration: 3000,
-          isClosable: true,
-        });
-      }
-    } catch (err) {
-      console.error("Error deleting project:", err);
+ const handleDeleteProject = async (projectId) => {
+  try {
+    const response = await axios.post("https://globalindiabackendnew.onrender.com/api/delete-project", {
+      projectId: projectId,
+      email: profileInfo.email
+    }, {
+      withCredentials: true
+    });
+    
+    if (response.status === 200) {
+      setProjects(projects.filter(project => project.id !== projectId && project._id !== projectId));
       toast({
-        title: "Delete failed",
-        description: "There was an error deleting your project",
-        status: "error",
+        title: "Project deleted",
+        description: "Your project has been deleted successfully",
+        status: "success",
         duration: 3000,
         isClosable: true,
       });
     }
-  };
+  } catch (err) {
+    console.error("Error deleting project:", err);
+    toast({
+      title: "Delete failed",
+      description: err.response?.data?.error || "There was an error deleting your project",
+      status: "error",
+      duration: 3000,
+      isClosable: true,
+    });
+  }
+};
 
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px", lg: "100px" }}>
