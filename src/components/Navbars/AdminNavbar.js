@@ -20,6 +20,7 @@ export default function AdminNavbar(props) {
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('unknown');
   const toast = useToast();
   const API_URL = "https://globalindiabackendnew.onrender.com";
 
@@ -36,10 +37,35 @@ export default function AdminNavbar(props) {
 
   const testBackendConnection = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/health`);
-      console.log("Backend connection successful:", response.data);
+      // Try multiple endpoints to find one that works
+      const endpoints = [
+        `${API_URL}/api/health`,
+        `${API_URL}/api/status`,
+        `${API_URL}/`,
+        `${API_URL}/api/ping`
+      ];
+      
+      let connected = false;
+      for (const endpoint of endpoints) {
+        try {
+          const response = await axios.get(endpoint, { timeout: 5000 });
+          console.log(`Backend connection successful via ${endpoint}:`, response.data);
+          setBackendStatus('online');
+          connected = true;
+          break;
+        } catch (error) {
+          // Continue to next endpoint
+          continue;
+        }
+      }
+      
+      if (!connected) {
+        console.warn("Backend connection failed - all endpoints unreachable");
+        setBackendStatus('offline');
+      }
     } catch (error) {
-      console.error("Backend connection failed:", error);
+      console.error("Backend connection test failed:", error);
+      setBackendStatus('offline');
     }
   };
 
@@ -106,10 +132,22 @@ export default function AdminNavbar(props) {
       return;
     }
 
+    if (backendStatus === 'offline') {
+      toast({
+        title: "Backend unavailable",
+        description: "Cannot perform search - backend is offline",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_URL}/api/search`, {
-        params: { query: searchQuery }
+        params: { query: searchQuery },
+        timeout: 10000
       });
       
       // Handle the search results
@@ -198,6 +236,7 @@ export default function AdminNavbar(props) {
             fontSize="lg"
             fontWeight="bold"
             apiUrl={API_URL}
+            backendStatus={backendStatus}
           />
         </Box>
       </Flex>

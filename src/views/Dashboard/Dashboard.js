@@ -63,7 +63,7 @@ export default function Dashboard() {
   const location = useLocation();
   
   // Backend API URL
-    const API_URL = "https://globalindiabackendnew.onrender.com/api";
+  const API_URL = "https://globalindiabackendnew.onrender.com/api";
 
   
   // State for dashboard table data
@@ -97,6 +97,7 @@ export default function Dashboard() {
   
   const [userType, setUserType] = useState('');
   const [dailyData, setDailyData] = useState([]);
+  const [userData, setUserData] = useState(null); // Add state to store user data
 
   // Function to filter daily work data by date
   const filterDailyWorkByDate = (data, date) => {
@@ -143,7 +144,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Extract the base path (admin or client) from the current location
-    var userData = JSON.parse(localStorage.getItem("user"));
+    let userData = JSON.parse(localStorage.getItem("user"));
     
     if(userData === null || userData === undefined) {
       userData = JSON.parse(sessionStorage.getItem("user"));
@@ -151,8 +152,14 @@ export default function Dashboard() {
 
     if(userData && userData.role) {
       setUserType(userData.role);
+      setUserData(userData); // Store complete user data
     }
   }, [location]);
+
+  // Check if user is admin
+  const isAdmin = () => {
+    return userData && (userData.role === 'admin' || userData.role === 'Admin');
+  };
 
   // Navigation function
   const navigateTo = (page) => {
@@ -198,7 +205,7 @@ export default function Dashboard() {
   const handleEdit = (item, tableName) => {
     setEditModal({
       isOpen: true,
-      data: item,
+      data: { ...item }, // Create a copy to avoid direct mutation
       tableName: tableName
     });
   };
@@ -207,7 +214,8 @@ export default function Dashboard() {
     try {
       const response = await axios.put(`${API_URL}/dashboard-tables/update/${updatedData._id}`, {
         ...updatedData,
-        tableName: editModal.tableName
+        tableName: editModal.tableName,
+        updatedBy: userData?.username || userData?.email || 'admin'
       });
       
       if (response.data.success) {
@@ -256,10 +264,18 @@ export default function Dashboard() {
 
   // EditModal component
   const EditModal = () => {
-    const [formData, setFormData] = useState(editModal.data || {});
+    const [formData, setFormData] = useState({});
 
     useEffect(() => {
-      setFormData(editModal.data || {});
+      if (editModal.data) {
+        // Ensure all default values are properly set
+        setFormData({
+          ...editModal.data,
+          project: editModal.data.project || "",
+          status: editModal.data.status || "Pending",
+          date: editModal.data.date ? new Date(editModal.data.date).toISOString().split('T')[0] : ""
+        });
+      }
     }, [editModal.data]);
 
     const handleInputChange = (field, value) => {
@@ -279,25 +295,28 @@ export default function Dashboard() {
                 <Input
                   value={formData.project || ""}
                   onChange={(e) => handleInputChange("project", e.target.value)}
+                  placeholder="Enter project name"
                 />
               </FormControl>
               <FormControl>
                 <FormLabel>Status</FormLabel>
                 <Select
-                  value={formData.status || ""}
+                  value={formData.status || "Pending"}
                   onChange={(e) => handleInputChange("status", e.target.value)}
                 >
                   <option value="Pending">Pending</option>
                   <option value="In Progress">In Progress</option>
+                  <option value="Processing">Processing</option>
                   <option value="Completed">Completed</option>
                   <option value="Cancelled">Cancelled</option>
+                  <option value="Active">Active</option>
                 </Select>
               </FormControl>
               <FormControl>
                 <FormLabel>Date</FormLabel>
                 <Input
                   type="date"
-                  value={formData.date ? new Date(formData.date).toISOString().split('T')[0] : ""}
+                  value={formData.date || ""}
                   onChange={(e) => handleInputChange("date", e.target.value)}
                 />
               </FormControl>
@@ -308,7 +327,7 @@ export default function Dashboard() {
               Cancel
             </Button>
             <Button colorScheme="blue" onClick={() => handleSaveEdit(formData)}>
-              Save
+              Save Changes
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -906,7 +925,12 @@ export default function Dashboard() {
                     />
                     Date
                   </Th>
-                  <Th color="gray.400" borderColor={borderColor}></Th>
+                  {/* Only show Actions column for admin */}
+                  {isAdmin() && (
+                    <Th color="gray.400" borderColor={borderColor}>
+                      Actions
+                    </Th>
+                  )}
                 </Tr>
               </Thead>
               <Tbody>
@@ -924,23 +948,27 @@ export default function Dashboard() {
                         {item.status || "Pending"}
                       </Td>
                       <Td color={textTableColor} fontSize="sm" borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
-                        {new Date(item.date).toLocaleDateString()}
+                        {item.date ? new Date(item.date).toLocaleDateString() : "N/A"}
                       </Td>
-                      <Td borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          variant="ghost"
-                          onClick={() => handleEdit(item, currentTable)}
-                        >
-                          ✏️
-                        </Button>
-                      </Td>
+                      {/* Only show edit button for admin */}
+                      {isAdmin() && (
+                        <Td borderColor={borderColor} border={index === arr.length - 1 ? "none" : null}>
+                          <Button
+                            size="sm"
+                            colorScheme="blue"
+                            variant="ghost"
+                            onClick={() => handleEdit(item, currentTable)}
+                            title="Edit entry"
+                          >
+                            ✏️
+                          </Button>
+                        </Td>
+                      )}
                     </Tr>
                   ))
                 ) : (
                   <Tr>
-                    <Td colSpan={4} textAlign="center">No data available</Td>
+                    <Td colSpan={isAdmin() ? 4 : 3} textAlign="center">No data available</Td>
                   </Tr>
                 )}
               </Tbody>
@@ -949,8 +977,8 @@ export default function Dashboard() {
         </Card>
       </Grid>
 
-      {/* Edit Modal */}
-      <EditModal />
+      {/* Edit Modal - Only render if user is admin */}
+      {isAdmin() && <EditModal />}
     </Flex>
   );
 }
