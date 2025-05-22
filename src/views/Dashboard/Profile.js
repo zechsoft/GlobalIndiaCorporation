@@ -71,15 +71,9 @@ function Profile() {
   // Project states
   const [selectedProject, setSelectedProject] = useState(null);
   
-  // Updated profile image state initialization
-  const [profileImage, setProfileImage] = useState(() => {
-    if (user.profileImage) {
-      return user.profileImage.startsWith('/uploads') ? 
-        `https://globalindiabackendnew.onrender.com${user.profileImage}` : 
-        user.profileImage;
-    }
-    return avatar5; // fallback to default avatar
-  });
+  // Updated profile image state initialization with cache busting
+  const [profileImage, setProfileImage] = useState(avatar5);
+  const [imageKey, setImageKey] = useState(Date.now()); // For forcing re-render
   
   const [projects, setProjects] = useState([]);
 
@@ -96,18 +90,52 @@ function Profile() {
   // Load user projects on component mount
   useEffect(() => {
     loadUserProjects();
+    loadUserProfile(); // Load fresh profile data
   }, []);
 
-  // Add useEffect to handle profile image loading on component mount
-  useEffect(() => {
-    // Load profile image properly when component mounts
-    if (user.profileImage && !profileImage.includes('avatar')) {
-      const fullImageUrl = user.profileImage.startsWith('/uploads') ? 
-        `https://globalindiabackendnew.onrender.com${user.profileImage}` : 
-        user.profileImage;
-      setProfileImage(fullImageUrl);
+  // Function to load fresh user profile data
+  const loadUserProfile = async () => {
+    try {
+      const response = await axios.post("https://globalindiabackendnew.onrender.com/api/get-user-profile", {
+        email: user.email
+      }, {
+        withCredentials: true
+      });
+      
+      if (response.status === 200 && response.data.user) {
+        const userData = response.data.user;
+        
+        // Update profile info
+        setProfileInfo({
+          fullName: userData.userName || "",
+          mobile: userData.mobile || "",
+          email: userData.Email || "",
+          location: userData.location || "",
+          bio: userData.bio || "",
+        });
+        
+        // Update profile image with proper URL and cache busting
+        if (userData.profileImage) {
+          const fullImageUrl = userData.profileImage.startsWith('/uploads') ? 
+            `https://globalindiabackendnew.onrender.com${userData.profileImage}` : 
+            userData.profileImage;
+          setProfileImage(fullImageUrl);
+          setImageKey(Date.now()); // Force re-render
+        } else {
+          setProfileImage(avatar5);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading user profile:", err);
+      // Fallback to existing user data
+      if (user.profileImage) {
+        const fullImageUrl = user.profileImage.startsWith('/uploads') ? 
+          `https://globalindiabackendnew.onrender.com${user.profileImage}` : 
+          user.profileImage;
+        setProfileImage(fullImageUrl);
+      }
     }
-  }, [user.profileImage]);
+  };
 
   // Load user projects from the backend
   const loadUserProjects = async () => {
@@ -209,7 +237,7 @@ function Profile() {
     setProfileInfo({ ...profileInfo, [name]: value });
   };
 
-  // Updated handleImageUpload function
+  // Updated handleImageUpload function with better image handling
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -219,14 +247,7 @@ function Profile() {
       formData.append("email", profileInfo.email);
       
       try {
-        // First update the preview immediately
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setProfileImage(reader.result);
-        };
-        reader.readAsDataURL(file);
-        
-        // Then send to server
+        // Send to server immediately
         const response = await axios.post("https://globalindiabackendnew.onrender.com/api/upload-profile-image", 
           formData, 
           {
@@ -246,12 +267,13 @@ function Profile() {
             sessionStorage.setItem("user", JSON.stringify(updatedUser));
           }
           
-          // Update profile image state with full URL
+          // Update profile image state with full URL from server response
           const fullImageUrl = response.data.imageUrl.startsWith('/uploads') ? 
             `https://globalindiabackendnew.onrender.com${response.data.imageUrl}` : 
             response.data.imageUrl;
           
           setProfileImage(fullImageUrl);
+          setImageKey(Date.now()); // Force re-render with new key
           
           toast({
             title: "Image uploaded",
