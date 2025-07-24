@@ -21,82 +21,17 @@ export default function AdminNavbar(props) {
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [backendStatus, setBackendStatus] = useState('checking');
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
   const toast = useToast();
   const API_URL = "https://globalindiabackendnew.onrender.com";
 
   useEffect(() => {
-    window.addEventListener("scroll", changeNavbar);
-    
-    // Test connection to backend on component mount
-    testBackendConnection();
+    const handleScroll = () => changeNavbar();
+    window.addEventListener("scroll", handleScroll);
     
     return () => {
-      window.removeEventListener("scroll", changeNavbar);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
-
-  const testBackendConnection = async (retryCount = 0) => {
-    const maxRetries = 3;
-    const retryDelay = 8000; // 8 seconds for Render services
-    
-    setConnectionAttempts(retryCount + 1);
-    
-    try {
-      console.log(`Testing backend connection... Attempt ${retryCount + 1}/${maxRetries + 1}`);
-      setBackendStatus('connecting');
-      
-      // Try the root URL first - most likely to respond
-      const response = await axios.get(API_URL, { 
-        timeout: 30000, // 30 second timeout for sleeping services
-        validateStatus: function (status) {
-          // Accept any response that indicates the server is alive
-          return status < 500;
-        }
-      });
-      
-      console.log(`Backend responded with status: ${response.status}`);
-      
-      // If we get any response, the service is alive
-      setBackendStatus('online');
-      
-      if (retryCount === 0) {
-        toast({
-          title: "Backend Connected",
-          description: "Successfully connected to backend service",
-          status: "success",
-          duration: 3000,
-          isClosable: true,
-        });
-      }
-      
-    } catch (error) {
-      console.error(`Connection attempt ${retryCount + 1} failed:`, error.message);
-      
-      if (error.code === 'ECONNABORTED') {
-        console.log("Connection timeout - backend service might be sleeping");
-      }
-      
-      if (retryCount < maxRetries) {
-        console.log(`Retrying in ${retryDelay/1000} seconds... (${maxRetries - retryCount} attempts remaining)`);
-        setBackendStatus('retrying');
-        
-        setTimeout(() => {
-          testBackendConnection(retryCount + 1);
-        }, retryDelay);
-      } else {
-        setBackendStatus('offline');
-        toast({
-          title: "Backend Offline",
-          description: "Could not connect to backend service. Some features may be limited.",
-          status: "warning",
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    }
-  };
 
   const {
     variant,
@@ -161,17 +96,6 @@ export default function AdminNavbar(props) {
       return;
     }
 
-    if (backendStatus !== 'online') {
-      toast({
-        title: "Backend unavailable",
-        description: `Cannot perform search - backend is ${backendStatus}`,
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
     setIsLoading(true);
     try {
       // Try different possible search endpoints
@@ -222,28 +146,6 @@ export default function AdminNavbar(props) {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (backendStatus) {
-      case 'online': return 'green';
-      case 'offline': return 'red';
-      case 'connecting': 
-      case 'retrying': 
-      case 'checking': return 'yellow';
-      default: return 'gray';
-    }
-  };
-
-  const getStatusText = () => {
-    switch (backendStatus) {
-      case 'online': return 'Online';
-      case 'offline': return 'Offline';
-      case 'connecting': return 'Connecting...';
-      case 'retrying': return `Retrying... (${connectionAttempts}/4)`;
-      case 'checking': return 'Checking...';
-      default: return 'Unknown';
     }
   };
 
@@ -298,14 +200,6 @@ export default function AdminNavbar(props) {
             >
               {brandText}
             </Link>
-            <Badge 
-              colorScheme={getStatusColor()} 
-              size="sm" 
-              fontSize="xs"
-              title={`Backend status: ${getStatusText()}`}
-            >
-              {getStatusText()}
-            </Badge>
           </Flex>
         </Box>
 
@@ -319,7 +213,6 @@ export default function AdminNavbar(props) {
             fontSize="lg"
             fontWeight="bold"
             apiUrl={API_URL}
-            backendStatus={backendStatus}
           />
         </Box>
       </Flex>
